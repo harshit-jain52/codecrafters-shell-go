@@ -20,7 +20,11 @@ func main() {
 		if command_split[0] == "exit" {
 			exit_code, _ := strconv.Atoi(command_split[1])
 			os.Exit(exit_code)
+		} else if command_split[0] == "echo" {
+			echoed_string := strings.Join(command_split[1:], " ")
+			fmt.Println(echoed_string[:len(echoed_string)-1])
+		} else {
+			fmt.Println(command[:len(command)-1] + ": command not found")
 		}
-		fmt.Println(command[:len(command)-1] + ": command not found")
 	}
 }
