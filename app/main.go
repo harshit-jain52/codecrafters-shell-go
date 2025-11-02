@@ -11,7 +11,7 @@ import (
 )
 
 var _ = fmt.Fprint
-var builtin_commands = []string{"exit", "echo", "type"}
+var builtin_commands = []string{"exit", "echo", "type", "pwd"}
 
 func searchFileWithPerms(dir string, command string, perms os.FileMode) (bool) {
 	files, err := os.ReadDir(dir)
@@ -73,6 +73,9 @@ func main() {
 					fmt.Printf("%s: not found\n", command_string)
 				}
 			}
+		} else if command_split[0] == "pwd"{
+			dir, _ := os.Getwd()
+			fmt.Println(dir)
 		} else if _ , ok := searchCommandInPath(command_split[0]); ok{
 			args := command_split[1:]
 			cmd := exec.Command(command_split[0], args...)
