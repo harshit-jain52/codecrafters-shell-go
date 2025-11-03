@@ -44,9 +44,16 @@ func searchCommandInPath(command string) (string, bool){
 	return "", false
 }
 
-func main() {
-	current_dir, _ := os.Getwd()
+func dirPartsToPath(parts []string) string {
+	if len(parts) == 0 {
+		return "/"
+	}
+	return "/" + strings.Join(parts, "/")
+}
 
+func main() {
+	dir, _ := os.Getwd()
+	current_dir := strings.Split(dir, "/")[1:]
 	for {
 		fmt.Fprint(os.Stdout, "$ ")
 		command, _ := bufio.NewReader(os.Stdin).ReadString('\n')
@@ -76,16 +83,40 @@ func main() {
 				}
 			}
 		} else if command_split[0] == "pwd"{
-			fmt.Println(current_dir)
+			fmt.Println(dirPartsToPath(current_dir))
 		} else if command_split[0] == "cd"{
-			absolute_path := command_split[1]
-			fileInfo, err := os.Stat(absolute_path)
-			if err != nil {
-				fmt.Printf("cd: %s: No such file or directory\n", absolute_path)
-			} else if !fileInfo.IsDir(){
-				fmt.Printf("cd: %s: Not a directory\n", absolute_path)
-			} else {
-				current_dir = absolute_path
+			tmp_current_dir := make([]string, len(current_dir))
+			copy(tmp_current_dir, current_dir)
+			dir_path := command_split[1]
+			valid_path := true
+			if dir_path[0] == '/' {
+				dir_path = dir_path[1:]
+				tmp_current_dir = []string{}
+			}
+			dir_parts := strings.Split(dir_path, "/")
+			for _, part := range dir_parts {
+				if part == ".." {
+					if len(tmp_current_dir) > 0 {
+						tmp_current_dir = tmp_current_dir[:len(tmp_current_dir)-1]
+					}
+				} else if part != "." && part != "" {
+					tmp_current_dir = append(tmp_current_dir, part)
+					tmp_path := dirPartsToPath(tmp_current_dir)
+					fileInfo, err := os.Stat(tmp_path)
+					if err != nil {
+						fmt.Printf("cd: %s: No such file or directory\n", tmp_path)
+						valid_path = false
+						break
+					} else if !fileInfo.IsDir(){
+						fmt.Printf("cd: %s: Not a directory\n", tmp_path)
+						valid_path = false
+						break
+					}
+				}
+			}
+
+			if valid_path {
+				current_dir = tmp_current_dir
 			}
 		} else if _ , ok := searchCommandInPath(command_split[0]); ok{
 			args := command_split[1:]
