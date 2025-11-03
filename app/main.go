@@ -92,6 +92,11 @@ func main() {
 			if dir_path[0] == '/' {
 				dir_path = dir_path[1:]
 				tmp_current_dir = []string{}
+			} else if dir_path == "~" {
+				home_dir := os.Getenv("HOME")
+				home_parts := strings.Split(home_dir, "/")[1:]
+				tmp_current_dir = home_parts
+				dir_path = dir_path[1:]
 			}
 			dir_parts := strings.Split(dir_path, "/")
 			for _, part := range dir_parts {
