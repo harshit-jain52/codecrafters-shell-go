@@ -51,6 +51,34 @@ func dirPartsToPath(parts []string) string {
 	return "/" + strings.Join(parts, "/")
 }
 
+func handleSingleQuotes(args []string) []string {
+	var result []string
+	in_quotes := false
+	var current_arg strings.Builder
+	for _, arg := range args {
+		arg = strings.ReplaceAll(arg, "''", "")
+		if strings.HasPrefix(arg, "'") && strings.HasSuffix(arg, "'") {
+			result = append(result, arg[1:len(arg)-1])
+		} else if strings.HasPrefix(arg, "'") {
+			in_quotes = true
+			current_arg.WriteString(arg[1:])
+		} else if strings.HasSuffix(arg, "'") {
+			in_quotes = false
+			current_arg.WriteString(" " + arg[:len(arg)-1])
+			result = append(result, current_arg.String())
+			current_arg.Reset()
+		} else if in_quotes {
+			current_arg.WriteString(" " + arg)
+		} else {
+			arg = strings.TrimSpace(arg)
+			if len(arg) !=0 {
+				result = append(result, arg)
+			}
+		}
+	}
+	return result
+}
+
 func main() {
 	dir, _ := os.Getwd()
 	current_dir := strings.Split(dir, "/")[1:]
@@ -59,14 +87,16 @@ func main() {
 		command, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		command = strings.TrimSpace(command)
 		command_split := strings.Split(command, " ")
+		args := command_split[1:]
+		args = handleSingleQuotes(args)
 		if command_split[0] == "exit" {
-			exit_code, _ := strconv.Atoi(command_split[1])
+			exit_code, _ := strconv.Atoi(args[0])
 			os.Exit(exit_code)
 		} else if command_split[0] == "echo" {
-			echoed_string := strings.Join(command_split[1:], " ")
+			echoed_string := strings.Join(args, " ")
 			fmt.Println(echoed_string)
 		} else if command_split[0] == "type" {
-			command_string := strings.Join(command_split[1:], " ")
+			command_string := strings.Join(args, " ")
 			builtin_found := false
 			for _, cmd := range builtin_commands {
 				if cmd == command_string {
@@ -124,7 +154,6 @@ func main() {
 				current_dir = tmp_current_dir
 			}
 		} else if _ , ok := searchCommandInPath(command_split[0]); ok{
-			args := command_split[1:]
 			cmd := exec.Command(command_split[0], args...)
 			output, _ := cmd.Output()
 			fmt.Printf("%s", output)
