@@ -51,28 +51,45 @@ func dirPartsToPath(parts []string) string {
 	return "/" + strings.Join(parts, "/")
 }
 
-func handleSingleQuotes(args []string) []string {
+func handleQuotes(args []string) []string {
 	var result []string
-	in_quotes := false
+	in_single_quotes := false
+	in_double_quotes := false
 	var current_arg strings.Builder
 	for _, arg := range args {
-		arg = strings.ReplaceAll(arg, "''", "")
-		if strings.HasPrefix(arg, "'") && strings.HasSuffix(arg, "'") {
+		arg = strings.ReplaceAll(arg, "\"\"", "")
+		if strings.HasPrefix(arg, "\"") && strings.HasSuffix(arg, "\"") {
 			result = append(result, arg[1:len(arg)-1])
-		} else if strings.HasPrefix(arg, "'") {
-			in_quotes = true
+		} else if strings.HasPrefix(arg, "\"") {
+			in_double_quotes = true
 			current_arg.WriteString(arg[1:])
-		} else if strings.HasSuffix(arg, "'") {
-			in_quotes = false
+		} else if strings.HasSuffix(arg, "\"") {
+			in_double_quotes = false
 			current_arg.WriteString(" " + arg[:len(arg)-1])
 			result = append(result, current_arg.String())
 			current_arg.Reset()
-		} else if in_quotes {
+		} else if in_double_quotes {
 			current_arg.WriteString(" " + arg)
+			continue
 		} else {
-			arg = strings.TrimSpace(arg)
-			if len(arg) !=0 {
-				result = append(result, arg)
+			arg = strings.ReplaceAll(arg, "''", "")
+			if strings.HasPrefix(arg, "'") && strings.HasSuffix(arg, "'") {
+				result = append(result, arg[1:len(arg)-1])
+			} else if strings.HasPrefix(arg, "'") {
+				in_single_quotes = true
+				current_arg.WriteString(arg[1:])
+			} else if strings.HasSuffix(arg, "'") {
+				in_single_quotes = false
+				current_arg.WriteString(" " + arg[:len(arg)-1])
+				result = append(result, current_arg.String())
+				current_arg.Reset()
+			} else if in_single_quotes {
+				current_arg.WriteString(" " + arg)
+			} else {
+				arg = strings.TrimSpace(arg)
+				if len(arg) !=0 {
+					result = append(result, arg)
+				}
 			}
 		}
 	}
@@ -88,7 +105,7 @@ func main() {
 		command = strings.TrimSpace(command)
 		command_split := strings.Split(command, " ")
 		args := command_split[1:]
-		args = handleSingleQuotes(args)
+		args = handleQuotes(args)
 		if command_split[0] == "exit" {
 			exit_code, _ := strconv.Atoi(args[0])
 			os.Exit(exit_code)
