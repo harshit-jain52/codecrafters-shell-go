@@ -58,12 +58,12 @@ func handleQuotes(args []string) []string {
 	var current_arg strings.Builder
 	for _, arg := range args {
 		arg = strings.ReplaceAll(arg, "\"\"", "")
-		if strings.HasPrefix(arg, "\"") && strings.HasSuffix(arg, "\"") {
+		if strings.HasPrefix(arg, "\"") && strings.HasSuffix(arg, "\"") && !strings.HasSuffix(arg, "\\\"") {
 			result = append(result, arg[1:len(arg)-1])
 		} else if strings.HasPrefix(arg, "\"") {
 			in_double_quotes = true
 			current_arg.WriteString(arg[1:])
-		} else if strings.HasSuffix(arg, "\"") {
+		} else if strings.HasSuffix(arg, "\"") && !strings.HasSuffix(arg, "\\\"") {
 			in_double_quotes = false
 			current_arg.WriteString(" " + arg[:len(arg)-1])
 			result = append(result, current_arg.String())
@@ -73,12 +73,12 @@ func handleQuotes(args []string) []string {
 			continue
 		} else {
 			arg = strings.ReplaceAll(arg, "''", "")
-			if strings.HasPrefix(arg, "'") && strings.HasSuffix(arg, "'") {
+			if strings.HasPrefix(arg, "'") && strings.HasSuffix(arg, "'") && !strings.HasSuffix(arg, "\\'") {
 				result = append(result, arg[1:len(arg)-1])
 			} else if strings.HasPrefix(arg, "'") {
 				in_single_quotes = true
 				current_arg.WriteString(arg[1:])
-			} else if strings.HasSuffix(arg, "'") {
+			} else if strings.HasSuffix(arg, "'") && !strings.HasSuffix(arg, "\\'"){
 				in_single_quotes = false
 				current_arg.WriteString(" " + arg[:len(arg)-1])
 				result = append(result, current_arg.String())
@@ -86,6 +86,8 @@ func handleQuotes(args []string) []string {
 			} else if in_single_quotes {
 				current_arg.WriteString(" " + arg)
 			} else {
+				arg = strings.ReplaceAll(arg, "\\'", "'")
+				arg = strings.ReplaceAll(arg, "\\\"", "\"")
 				arg = strings.TrimSpace(arg)
 				if len(arg) !=0 {
 					result = append(result, arg)
@@ -96,6 +98,32 @@ func handleQuotes(args []string) []string {
 	return result
 }
 
+func splitIntoArgs(arg_str string) []string {
+	var args []string
+	var current_arg strings.Builder
+	in_single_quotes := false
+	in_double_quotes := false
+	for i := 0; i < len(arg_str); i++ {
+		if arg_str[i] == '\'' && !in_double_quotes {
+			current_arg.WriteByte(arg_str[i])
+			in_single_quotes = !in_single_quotes
+		} else if arg_str[i] == '"' {
+			current_arg.WriteByte(arg_str[i])
+			in_double_quotes = !in_double_quotes
+		} else if arg_str[i] == '\\' && i+1 < len(arg_str) && arg_str[i+1] != '"' && arg_str[i+1] != '\'' && !in_single_quotes && !in_double_quotes {
+			current_arg.WriteByte(arg_str[i+1])
+			i++
+		} else  if arg_str[i] == ' ' {
+			args = append(args, current_arg.String())
+			current_arg.Reset()
+		} else {
+			current_arg.WriteByte(arg_str[i])
+		}
+	}
+	args = append(args, current_arg.String())
+	return args
+}
+
 func main() {
 	dir, _ := os.Getwd()
 	current_dir := strings.Split(dir, "/")[1:]
@@ -104,7 +132,8 @@ func main() {
 		command, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		command = strings.TrimSpace(command)
 		command_split := strings.Split(command, " ")
-		args := command_split[1:]
+		arg_str := strings.Join(command_split[1:], " ")
+		args := splitIntoArgs(arg_str)
 		args = handleQuotes(args)
 		if command_split[0] == "exit" {
 			exit_code, _ := strconv.Atoi(args[0])
