@@ -114,16 +114,19 @@ func splitIntoArgs(arg_str string) []string {
 	return args
 }
 
-func posRedirect(args []string) int {
+func posRedirect(args []string) (int, int) {
 	for i, arg := range args {
 		if arg == ">" {
-			return i
+			return i, len(args)
 		}
 		if arg == "1>" {
-			return i
+			return i, len(args)
+		}
+		if arg == "2>" {
+			return len(args), i
 		}
 	}
-	return len(args)
+	return len(args), len(args)
 }
 
 func main() {
@@ -134,7 +137,8 @@ func main() {
 		command, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		command = strings.TrimSpace(command)
 		args := splitIntoArgs(command)
-		pos_redirect := posRedirect(args)
+		stdout_redir, stderr_redir := posRedirect(args)
+		pos_redirect := min(stdout_redir, stderr_redir)
 		stdout := ""
 		stderr := ""
 		if args[0] == "exit" {
@@ -215,18 +219,22 @@ func main() {
 			stdout = fmt.Sprintf("%s: command not found\n", command)
 		}
 
-		if pos_redirect < len(args) {
-			filename := args[pos_redirect+1]
-			file, err := os.Create(filename)
-			if err != nil {
-				fmt.Fprint(os.Stdout, err.Error()+"\n")
-				continue
-			}
+		if stdout_redir < len(args) {
+			filename := args[stdout_redir+1]
+			file, _ := os.Create(filename)
 			file.WriteString(stdout)
 			file.Close()
 		} else {
 			fmt.Fprint(os.Stdout, stdout)
 		}
-		fmt.Fprint(os.Stderr, stderr)
+
+		if stderr_redir < len(args) {
+			filename := args[stderr_redir+1]
+			file, _ := os.Create(filename)
+			file.WriteString(stderr)
+			file.Close()
+		} else {
+			fmt.Fprint(os.Stderr, stderr)
+		}
 	}
 }
