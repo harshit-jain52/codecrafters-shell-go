@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -113,6 +114,18 @@ func splitIntoArgs(arg_str string) []string {
 	return args
 }
 
+func posRedirect(args []string) int {
+	for i, arg := range args {
+		if arg == ">" {
+			return i
+		}
+		if arg == "1>" {
+			return i
+		}
+	}
+	return len(args)
+}
+
 func main() {
 	dir, _ := os.Getwd()
 	current_dir := strings.Split(dir, "/")[1:]
@@ -121,31 +134,34 @@ func main() {
 		command, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		command = strings.TrimSpace(command)
 		args := splitIntoArgs(command)
+		pos_redirect := posRedirect(args)
+		stdout := ""
+		stderr := ""
 		if args[0] == "exit" {
 			exit_code, _ := strconv.Atoi(args[0])
 			os.Exit(exit_code)
 		} else if args[0] == "echo" {
-			echoed_string := strings.Join(args[1:], " ")
-			fmt.Println(echoed_string)
+			echoed_string := strings.Join(args[1:pos_redirect], " ")
+			stdout = echoed_string + "\n"
 		} else if args[0] == "type" {
-			command_string := strings.Join(args[1:], " ")
+			command_string := args[1]
 			builtin_found := false
 			for _, cmd := range builtin_commands {
 				if cmd == command_string {
-					fmt.Printf("%s is a shell builtin\n", command_string)
+					stdout = fmt.Sprintf("%s is a shell builtin\n", command_string)
 					builtin_found = true
 					break
 				}
 			}
 			if !builtin_found {
 				if full_path, ok := searchCommandInPath(command_string); ok {
-					fmt.Printf("%s is %s\n", command_string, full_path)
+					stdout = fmt.Sprintf("%s is %s\n", command_string, full_path)
 				} else {
-					fmt.Printf("%s: not found\n", command_string)
+					stderr = fmt.Sprintf("%s: not found\n", command_string)
 				}
 			}
 		} else if args[0] == "pwd"{
-			fmt.Println(dirPartsToPath(current_dir))
+			stdout = dirPartsToPath(current_dir) + "\n"
 		} else if args[0] == "cd"{
 			tmp_current_dir := make([]string, len(current_dir))
 			copy(tmp_current_dir, current_dir)
@@ -171,11 +187,11 @@ func main() {
 					tmp_path := dirPartsToPath(tmp_current_dir)
 					fileInfo, err := os.Stat(tmp_path)
 					if err != nil {
-						fmt.Printf("cd: %s: No such file or directory\n", tmp_path)
+						stderr = fmt.Sprintf("cd: %s: No such file or directory\n", tmp_path)
 						valid_path = false
 						break
 					} else if !fileInfo.IsDir(){
-						fmt.Printf("cd: %s: Not a directory\n", tmp_path)
+						stderr = fmt.Sprintf("cd: %s: Not a directory\n", tmp_path)
 						valid_path = false
 						break
 					}
@@ -186,11 +202,31 @@ func main() {
 				current_dir = tmp_current_dir
 			}
 		} else if _ , ok := searchCommandInPath(args[0]); ok{
-			cmd := exec.Command(args[0], args[1:]...)
-			output, _ := cmd.Output()
-			fmt.Printf("%s", output)
+			cmd := exec.Command(args[0], args[1:pos_redirect]...)
+			var stdoutBuf, stderrBuf bytes.Buffer
+			cmd.Stdout = &stdoutBuf
+			cmd.Stderr = &stderrBuf
+
+			cmd.Run()
+
+			stdout = stdoutBuf.String()
+			stderr = stderrBuf.String()
 		} else {
-			fmt.Printf("%s: command not found\n", command)
+			stdout = fmt.Sprintf("%s: command not found\n", command)
 		}
+
+		if pos_redirect < len(args) {
+			filename := args[pos_redirect+1]
+			file, err := os.Create(filename)
+			if err != nil {
+				fmt.Fprint(os.Stdout, err.Error()+"\n")
+				continue
+			}
+			file.WriteString(stdout)
+			file.Close()
+		} else {
+			fmt.Fprint(os.Stdout, stdout)
+		}
+		fmt.Fprint(os.Stderr, stderr)
 	}
 }
