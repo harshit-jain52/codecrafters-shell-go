@@ -120,17 +120,15 @@ func main() {
 		fmt.Fprint(os.Stdout, "$ ")
 		command, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		command = strings.TrimSpace(command)
-		command_split := strings.Split(command, " ")
-		arg_str := strings.Join(command_split[1:], " ")
-		args := splitIntoArgs(arg_str)
-		if command_split[0] == "exit" {
+		args := splitIntoArgs(command)
+		if args[0] == "exit" {
 			exit_code, _ := strconv.Atoi(args[0])
 			os.Exit(exit_code)
-		} else if command_split[0] == "echo" {
-			echoed_string := strings.Join(args, " ")
+		} else if args[0] == "echo" {
+			echoed_string := strings.Join(args[1:], " ")
 			fmt.Println(echoed_string)
-		} else if command_split[0] == "type" {
-			command_string := strings.Join(args, " ")
+		} else if args[0] == "type" {
+			command_string := strings.Join(args[1:], " ")
 			builtin_found := false
 			for _, cmd := range builtin_commands {
 				if cmd == command_string {
@@ -146,12 +144,12 @@ func main() {
 					fmt.Printf("%s: not found\n", command_string)
 				}
 			}
-		} else if command_split[0] == "pwd"{
+		} else if args[0] == "pwd"{
 			fmt.Println(dirPartsToPath(current_dir))
-		} else if command_split[0] == "cd"{
+		} else if args[0] == "cd"{
 			tmp_current_dir := make([]string, len(current_dir))
 			copy(tmp_current_dir, current_dir)
-			dir_path := command_split[1]
+			dir_path := args[1]
 			valid_path := true
 			if dir_path[0] == '/' {
 				dir_path = dir_path[1:]
@@ -187,8 +185,8 @@ func main() {
 			if valid_path {
 				current_dir = tmp_current_dir
 			}
-		} else if _ , ok := searchCommandInPath(command_split[0]); ok{
-			cmd := exec.Command(command_split[0], args...)
+		} else if _ , ok := searchCommandInPath(args[0]); ok{
+			cmd := exec.Command(args[0], args[1:]...)
 			output, _ := cmd.Output()
 			fmt.Printf("%s", output)
 		} else {
