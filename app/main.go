@@ -114,19 +114,28 @@ func splitIntoArgs(arg_str string) []string {
 	return args
 }
 
-func posRedirect(args []string) (int, int) {
+func posRedirect(args []string) (int, int, bool) {
 	for i, arg := range args {
 		if arg == ">" {
-			return i, len(args)
+			return i, len(args), false
 		}
 		if arg == "1>" {
-			return i, len(args)
+			return i, len(args), false
 		}
 		if arg == "2>" {
-			return len(args), i
+			return len(args), i, false
+		}
+		if arg == ">>" {
+			return i, len(args), true
+		}
+		if arg == "1>>" {
+			return i, len(args), true
+		}
+		if arg == "2>>" {
+			return len(args), i, true
 		}
 	}
-	return len(args), len(args)
+	return len(args), len(args), false
 }
 
 func main() {
@@ -137,7 +146,7 @@ func main() {
 		command, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		command = strings.TrimSpace(command)
 		args := splitIntoArgs(command)
-		stdout_redir, stderr_redir := posRedirect(args)
+		stdout_redir, stderr_redir, is_append := posRedirect(args)
 		pos_redirect := min(stdout_redir, stderr_redir)
 		stdout := ""
 		stderr := ""
@@ -221,18 +230,30 @@ func main() {
 
 		if stdout_redir < len(args) {
 			filename := args[stdout_redir+1]
-			file, _ := os.Create(filename)
-			file.WriteString(stdout)
-			file.Close()
+			if is_append {
+				file, _ := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				file.WriteString(stdout)
+				file.Close()
+			} else {
+				file, _ := os.Create(filename)
+				file.WriteString(stdout)
+				file.Close()
+			}
 		} else {
 			fmt.Fprint(os.Stdout, stdout)
 		}
 
 		if stderr_redir < len(args) {
 			filename := args[stderr_redir+1]
-			file, _ := os.Create(filename)
-			file.WriteString(stderr)
-			file.Close()
+			if is_append {
+				file, _ := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				file.WriteString(stderr)
+				file.Close()
+			} else {
+				file, _ := os.Create(filename)
+				file.WriteString(stderr)
+				file.Close()
+			}
 		} else {
 			fmt.Fprint(os.Stderr, stderr)
 		}
