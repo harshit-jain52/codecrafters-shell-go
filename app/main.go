@@ -137,6 +137,24 @@ func posRedirect(args []string) (int, int, bool) {
 	return len(args), len(args), false
 }
 
+func searchExecutableForCompletion(dir string, prefix string) (string, bool) {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return "", false
+	}
+	
+	for _, file := range files {
+		if strings.HasPrefix(file.Name(), prefix) {
+			fileInfo, _ := file.Info()
+			mode := fileInfo.Mode()
+			if mode&os.FileMode(0111) != 0 {
+				return file.Name(), true
+			}
+		}
+	}
+	return "", false
+}
+
 func tryTabCompletion(input string) (string, bool) {
 	trimmed := strings.TrimSpace(input)	
 	for _, cmd := range builtin_commands {
@@ -145,6 +163,13 @@ func tryTabCompletion(input string) (string, bool) {
 		}
 	}
 
+	path_var := os.Getenv("PATH")
+	path_dirs := filepath.SplitList(path_var)
+	for _, dir := range path_dirs {
+		if cmd, ok := searchExecutableForCompletion(dir, trimmed); ok {
+			return cmd + " ", true
+		}
+	}
 	return input, false
 }
 
