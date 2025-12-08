@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -155,11 +156,29 @@ func searchExecutableForCompletion(dir string, prefix string) (string, bool) {
 	return "", false
 }
 
-func tryTabCompletion(input string) (string, bool) {
-	trimmed := strings.TrimSpace(input)	
+func removeDuplicatesAndSort(s []string) []string {
+	// Remove duplicates
+	seen := make(map[string]bool)
+	var uniqueStrings []string
+	for _, str := range s {
+		if !seen[str] {
+			seen[str] = true
+			uniqueStrings = append(uniqueStrings, str)
+		}
+	}
+
+	// Sort the unique strings
+	sort.Strings(uniqueStrings)
+
+	return uniqueStrings
+}
+
+func tryTabCompletion(input string) (string, bool, int) {
+	trimmed := strings.TrimSpace(input)
+	matches := []string{}
 	for _, cmd := range builtin_commands {
 		if strings.HasPrefix(cmd, trimmed) && len(trimmed) > 0 && len(trimmed) < len(cmd) {
-			return cmd + " ", true
+			matches = append(matches, cmd)
 		}
 	}
 
@@ -167,10 +186,14 @@ func tryTabCompletion(input string) (string, bool) {
 	path_dirs := filepath.SplitList(path_var)
 	for _, dir := range path_dirs {
 		if cmd, ok := searchExecutableForCompletion(dir, trimmed); ok {
-			return cmd + " ", true
+			matches = append(matches, cmd)
 		}
 	}
-	return input, false
+	matches = removeDuplicatesAndSort(matches)	
+	if len(matches) > 0 {
+		return strings.Join(matches, "  ") + " ", true, len(matches)
+	}
+	return input, false, 0
 }
 
 func readLineWithTabCompletion() (string, error) {
@@ -184,6 +207,7 @@ func readLineWithTabCompletion() (string, error) {
 	
 	var input strings.Builder
 	buf := make([]byte, 1)
+	var matches string
 	
 	for {
 		n, err := os.Stdin.Read(buf)
@@ -196,20 +220,35 @@ func readLineWithTabCompletion() (string, error) {
 		switch ch {
 		case '\t': // Tab key
 			currentInput := input.String()
-			if completed, ok := tryTabCompletion(currentInput); ok {
-				for i := 0; i < input.Len(); i++ {
-					fmt.Print("\b \b")
+			if matches != "" {
+				// print the matches on new line
+				fmt.Println()
+				fmt.Println(matches)
+				// reprint the prompt and current input
+				fmt.Print("$ " + currentInput)
+			}
+			if completed, ok, m := tryTabCompletion(currentInput); ok {
+				if m > 1 {
+					matches = completed
+					fmt.Print("\x07")
+				} else{
+					matches = ""
+					for i := 0; i < input.Len(); i++ {
+						fmt.Print("\b \b")
+					}
+					fmt.Print(completed)
+					input.Reset()
+					input.WriteString(completed)
 				}
-				fmt.Print(completed)
-				input.Reset()
-				input.WriteString(completed)
 			} else {
 				fmt.Print("\x07")
 			}
 		case '\r', '\n': // Enter key
+			matches = ""
 			fmt.Println()
 			return input.String(), nil
 		case 127, 8: // Backspace
+			matches = ""
 			if input.Len() > 0 {
 				fmt.Print("\b \b")
 				str := input.String()
@@ -220,6 +259,7 @@ func readLineWithTabCompletion() (string, error) {
 			fmt.Println()
 			return "", fmt.Errorf("interrupted")
 		default:
+			matches = ""
 			if ch >= 32 && ch <= 126 { // Printable characters
 				fmt.Print(string(ch))
 				input.WriteByte(ch)
