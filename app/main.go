@@ -178,6 +178,8 @@ func readLineWithTabCompletion() (string, error) {
 				fmt.Print(completed)
 				input.Reset()
 				input.WriteString(completed)
+			} else {
+				fmt.Print("\x07")
 			}
 		case '\r', '\n': // Enter key
 			fmt.Println()
