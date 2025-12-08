@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 )
 
@@ -138,21 +137,87 @@ func posRedirect(args []string) (int, int, bool) {
 	return len(args), len(args), false
 }
 
+func tryTabCompletion(input string) (string, bool) {
+	trimmed := strings.TrimSpace(input)	
+	for _, cmd := range builtin_commands {
+		if strings.HasPrefix(cmd, trimmed) && len(trimmed) > 0 && len(trimmed) < len(cmd) {
+			return cmd + " ", true
+		}
+	}
+
+	return input, false
+}
+
+func readLineWithTabCompletion() (string, error) {
+	oldState, err := makeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		reader := bufio.NewReader(os.Stdin)
+		line, err := reader.ReadString('\n')
+		return strings.TrimSpace(line), err
+	}
+	defer restore(int(os.Stdin.Fd()), oldState)
+	
+	var input strings.Builder
+	buf := make([]byte, 1)
+	
+	for {
+		n, err := os.Stdin.Read(buf)
+		if err != nil || n == 0 {
+			return "", err
+		}
+		
+		ch := buf[0]
+		
+		switch ch {
+		case '\t': // Tab key
+			currentInput := input.String()
+			if completed, ok := tryTabCompletion(currentInput); ok {
+				for i := 0; i < input.Len(); i++ {
+					fmt.Print("\b \b")
+				}
+				fmt.Print(completed)
+				input.Reset()
+				input.WriteString(completed)
+			}
+		case '\r', '\n': // Enter key
+			fmt.Println()
+			return input.String(), nil
+		case 127, 8: // Backspace
+			if input.Len() > 0 {
+				fmt.Print("\b \b")
+				str := input.String()
+				input.Reset()
+				input.WriteString(str[:len(str)-1])
+			}
+		case 3: // Ctrl+C
+			fmt.Println()
+			return "", fmt.Errorf("interrupted")
+		default:
+			if ch >= 32 && ch <= 126 { // Printable characters
+				fmt.Print(string(ch))
+				input.WriteByte(ch)
+			}
+		}
+	}
+}
+
 func main() {
 	dir, _ := os.Getwd()
 	current_dir := strings.Split(dir, "/")[1:]
 	for {
 		fmt.Fprint(os.Stdout, "$ ")
-		command, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+		command, _ := readLineWithTabCompletion()
 		command = strings.TrimSpace(command)
+		if command == "" {
+			continue
+		}
 		args := splitIntoArgs(command)
 		stdout_redir, stderr_redir, is_append := posRedirect(args)
 		pos_redirect := min(stdout_redir, stderr_redir)
 		stdout := ""
 		stderr := ""
 		if args[0] == "exit" {
-			exit_code, _ := strconv.Atoi(args[0])
-			os.Exit(exit_code)
+			os.Exit(0)
 		} else if args[0] == "echo" {
 			echoed_string := strings.Join(args[1:pos_redirect], " ")
 			stdout = echoed_string + "\n"
@@ -225,7 +290,7 @@ func main() {
 			stdout = stdoutBuf.String()
 			stderr = stderrBuf.String()
 		} else {
-			stdout = fmt.Sprintf("%s: command not found\n", command)
+			stderr = fmt.Sprintf("%s: command not found\n", args[0])
 		}
 
 		if stdout_redir < len(args) {
