@@ -173,6 +173,22 @@ func removeDuplicatesAndSort(s []string) []string {
 	return uniqueStrings
 }
 
+func longestCommonPrefix(strs []string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	prefix := strs[0]
+	for _, str := range strs[1:] {
+		for strings.Index(str, prefix) != 0 {
+			prefix = prefix[:len(prefix)-1]
+			if prefix == "" {
+				return ""
+			}
+		}
+	}
+	return prefix
+}
+
 func tryTabCompletion(input string) (string, bool, int) {
 	trimmed := strings.TrimSpace(input)
 	matches := []string{}
@@ -189,7 +205,11 @@ func tryTabCompletion(input string) (string, bool, int) {
 			matches = append(matches, cmd)
 		}
 	}
-	matches = removeDuplicatesAndSort(matches)	
+	matches = removeDuplicatesAndSort(matches)
+	lcp := longestCommonPrefix(matches)
+	if len(matches) > 1 && lcp != "" && lcp != trimmed {
+		return lcp, true, 1
+	}
 	if len(matches) > 0 {
 		return strings.Join(matches, "  ") + " ", true, len(matches)
 	}
