@@ -540,26 +540,6 @@ func executePipeline(segments [][]string, current_dir []string) []string {
 	return current_dir
 }
 
-func readHistoryFromFile(file_path string) []string {
-	file, err := os.Open(file_path)
-	if err != nil {
-		return []string{}
-	}
-	defer file.Close()
-
-	var lines []string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
-			break
-		}
-		lines = append(lines, line)
-	}
-
-	return lines
-}
-
 func main() {
 	dir, _ := os.Getwd()
 	current_dir := strings.Split(dir, "/")[1:]
@@ -647,10 +627,14 @@ func main() {
 			}
 		} else if args[0] == "history" {
 			n := len(history_cmds)
-			if len(args) > 2 && args[1] == "-r" {
-				history_file_cmds := readHistoryFromFile(args[2])
-				for _, cmd := range history_file_cmds {
-					history_cmds = append(history_cmds, cmd)
+			if len(args) > 2 {
+				if args[1] == "-r" {
+					history_file_cmds := readHistoryFromFile(args[2])
+					for _, cmd := range history_file_cmds {
+						history_cmds = append(history_cmds, cmd)
+					}
+				} else if args[1] == "-w" {
+					writeHistoryToFile(args[2], history_cmds)
 				}
 			}
 			if len(args) > 1 {
