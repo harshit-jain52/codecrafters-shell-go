@@ -233,6 +233,16 @@ func readLineWithTabCompletion() (string, error) {
 	var input strings.Builder
 	buf := make([]byte, 1)
 	var matches string
+	historyPos := len(history_cmds)
+	inHistoryNav := false
+	pendingInput := ""
+
+	redraw := func(newInput string) {
+		fmt.Print("\r\x1b[2K$ ")
+		fmt.Print(newInput)
+		input.Reset()
+		input.WriteString(newInput)
+	}
 	
 	for {
 		n, err := os.Stdin.Read(buf)
@@ -243,7 +253,50 @@ func readLineWithTabCompletion() (string, error) {
 		ch := buf[0]
 		
 		switch ch {
+		case 27: // Escape sequence (e.g. arrow keys)
+			escSeq := make([]byte, 2)
+			if _, err := io.ReadFull(os.Stdin, escSeq); err != nil {
+				continue
+			}
+			if escSeq[0] != '[' {
+				continue
+			}
+
+			switch escSeq[1] {
+			case 'A': // Up arrow
+				if len(history_cmds) == 0 {
+					fmt.Print("\x07")
+					continue
+				}
+				if !inHistoryNav {
+					pendingInput = input.String()
+					historyPos = len(history_cmds)
+					inHistoryNav = true
+				}
+				if historyPos > 0 {
+					historyPos--
+					redraw(history_cmds[historyPos])
+				} else {
+					fmt.Print("\x07")
+				}
+			case 'B': // Down arrow
+				if !inHistoryNav {
+					fmt.Print("\x07")
+					continue
+				}
+				if historyPos < len(history_cmds)-1 {
+					historyPos++
+					redraw(history_cmds[historyPos])
+				} else {
+					inHistoryNav = false
+					historyPos = len(history_cmds)
+					redraw(pendingInput)
+				}
+			}
 		case '\t': // Tab key
+			inHistoryNav = false
+			historyPos = len(history_cmds)
+			pendingInput = ""
 			currentInput := input.String()
 			if matches != "" {
 				// print the matches on new line
@@ -273,6 +326,9 @@ func readLineWithTabCompletion() (string, error) {
 			fmt.Println()
 			return input.String(), nil
 		case 127, 8: // Backspace
+			inHistoryNav = false
+			historyPos = len(history_cmds)
+			pendingInput = ""
 			matches = ""
 			if input.Len() > 0 {
 				fmt.Print("\b \b")
@@ -284,6 +340,9 @@ func readLineWithTabCompletion() (string, error) {
 			fmt.Println()
 			return "", fmt.Errorf("interrupted")
 		default:
+			inHistoryNav = false
+			historyPos = len(history_cmds)
+			pendingInput = ""
 			matches = ""
 			if ch >= 32 && ch <= 126 { // Printable characters
 				fmt.Print(string(ch))
