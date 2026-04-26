@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -566,8 +567,13 @@ func main() {
 				current_dir = tmp_current_dir
 			}
 		} else if args[0] == "history" {
-			for i, cmd := range history_cmds {
-				stdout += fmt.Sprintf("%d %s\n", i+1, cmd)
+			n := len(history_cmds)
+			if len(args) > 1 {
+				n, _ = strconv.Atoi(args[1])
+				n = min(n, len(history_cmds))
+			}
+			for i := len(history_cmds)-n; i < len(history_cmds); i++ {
+				stdout += fmt.Sprintf("%d %s\n", i+1, history_cmds[i])
 			}
 		} else if _ , ok := searchCommandInPath(args[0]); ok{
 			cmd := exec.Command(args[0], args[1:pos_redirect]...)
