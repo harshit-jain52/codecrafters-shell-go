@@ -17,7 +17,7 @@ import (
 
 var _ = fmt.Fprint
 var builtin_commands = []string{"exit", "echo", "type", "pwd", "cd", "history"}
-var history_cmds []string
+var history_cmds []string = readHistoryFromFile(os.Getenv("HISTFILE"))
 
 func searchFileWithPerms(dir string, command string, perms os.FileMode) (bool) {
 	files, err := os.ReadDir(dir)
@@ -566,6 +566,7 @@ func main() {
 		stdout := ""
 		stderr := ""
 		if args[0] == "exit" {
+			writeHistoryToFile(os.Getenv("HISTFILE"), history_cmds)
 			os.Exit(0)
 		} else if args[0] == "echo" {
 			echoed_string := strings.Join(args[1:pos_redirect], " ")
