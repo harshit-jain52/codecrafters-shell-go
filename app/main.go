@@ -635,6 +635,8 @@ func main() {
 					}
 				} else if args[1] == "-w" {
 					writeHistoryToFile(args[2], history_cmds)
+				} else if args[1] == "-a" {
+					appendHistoryToFile(args[2], history_cmds)
 				}
 			}
 			if len(args) > 1 {
