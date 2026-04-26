@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -288,6 +289,111 @@ func readLineWithTabCompletion() (string, error) {
 	}
 }
 
+func splitByPipe(args []string) [][]string {
+	var segments [][]string
+	var current []string
+	for _, arg := range args {
+		if arg == "|" {
+			if len(current) > 0 {
+				segments = append(segments, current)
+				current = nil
+			}
+		} else {
+			current = append(current, arg)
+		}
+	}
+	if len(current) > 0 {
+		segments = append(segments, current)
+	}
+	return segments
+}
+
+func executePipeline(segments [][]string, current_dir []string) []string {
+	n := len(segments)
+	pipes := make([]*os.File, 0)
+	var cmds []*exec.Cmd
+	var pipeReaders []*os.File
+	var pipeWriters []*os.File
+
+	for i := 0; i < n-1; i++ {
+		r, w, err := os.Pipe()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "pipe: %v\n", err)
+			return current_dir
+		}
+		pipeReaders = append(pipeReaders, r)
+		pipeWriters = append(pipeWriters, w)
+		pipes = append(pipes, r, w)
+	}
+
+	for i, seg := range segments {
+		args := seg
+		stdout_redir, stderr_redir, is_append := posRedirect(args)
+		pos_redirect := min(stdout_redir, stderr_redir)
+		cmdArgs := args[:pos_redirect]
+
+		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+
+		if i == 0 {
+			cmd.Stdin = os.Stdin
+		} else {
+			cmd.Stdin = pipeReaders[i-1]
+		}
+
+		if i == n-1 {
+			if stdout_redir < len(args) {
+				filename := args[stdout_redir+1]
+				var file *os.File
+				if is_append {
+					file, _ = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				} else {
+					file, _ = os.Create(filename)
+				}
+				cmd.Stdout = file
+				defer file.Close()
+			} else {
+				cmd.Stdout = os.Stdout
+			}
+			if stderr_redir < len(args) {
+				filename := args[stderr_redir+1]
+				var file *os.File
+				if is_append {
+					file, _ = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				} else {
+					file, _ = os.Create(filename)
+				}
+				cmd.Stderr = file
+				defer file.Close()
+			} else {
+				cmd.Stderr = os.Stderr
+			}
+		} else {
+			cmd.Stdout = pipeWriters[i]
+			cmd.Stderr = os.Stderr
+		}
+
+		cmds = append(cmds, cmd)
+	}
+
+	for _, cmd := range cmds {
+		cmd.Start()
+	}
+
+	for i := 0; i < len(pipeWriters); i++ {
+		pipeWriters[i].Close()
+	}
+
+	for _, cmd := range cmds {
+		cmd.Wait()
+	}
+
+	for i := 0; i < len(pipeReaders); i++ {
+		pipeReaders[i].Close()
+	}
+
+	return current_dir
+}
+
 func main() {
 	dir, _ := os.Getwd()
 	current_dir := strings.Split(dir, "/")[1:]
@@ -299,6 +405,16 @@ func main() {
 			continue
 		}
 		args := splitIntoArgs(command)
+
+		// Check for pipeline
+		hasPipe := slices.Contains(args, "|")
+
+		if hasPipe {
+			segments := splitByPipe(args)
+			current_dir = executePipeline(segments, current_dir)
+			continue
+		}
+
 		stdout_redir, stderr_redir, is_append := posRedirect(args)
 		pos_redirect := min(stdout_redir, stderr_redir)
 		stdout := ""
