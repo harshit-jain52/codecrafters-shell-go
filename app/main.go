@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 )
 
 var _ = fmt.Fprint
@@ -308,10 +310,77 @@ func splitByPipe(args []string) [][]string {
 	return segments
 }
 
+// runBuiltin executes a builtin command, reading from stdin and writing to stdout/stderr.
+// Returns the (possibly updated) current_dir.
+func runBuiltin(cmdArgs []string, stdin io.Reader, stdout io.Writer, stderr io.Writer, current_dir []string) []string {
+	switch cmdArgs[0] {
+	case "echo":
+		fmt.Fprintln(stdout, strings.Join(cmdArgs[1:], " "))
+	case "pwd":
+		fmt.Fprintln(stdout, dirPartsToPath(current_dir))
+	case "type":
+		if len(cmdArgs) < 2 {
+			return current_dir
+		}
+		name := cmdArgs[1]
+		if slices.Contains(builtin_commands, name) {
+			fmt.Fprintf(stdout, "%s is a shell builtin\n", name)
+		} else if full_path, ok := searchCommandInPath(name); ok {
+			fmt.Fprintf(stdout, "%s is %s\n", name, full_path)
+		} else {
+			fmt.Fprintf(stderr, "%s: not found\n", name)
+		}
+	case "cd":
+		tmp := make([]string, len(current_dir))
+		copy(tmp, current_dir)
+		dir_path := cmdArgs[1]
+		valid := true
+		if dir_path[0] == '/' {
+			dir_path = dir_path[1:]
+			tmp = []string{}
+		} else if dir_path == "~" {
+			home_parts := strings.Split(os.Getenv("HOME"), "/")[1:]
+			tmp = home_parts
+			dir_path = dir_path[1:]
+		}
+		for _, part := range strings.Split(dir_path, "/") {
+			if part == ".." {
+				if len(tmp) > 0 {
+					tmp = tmp[:len(tmp)-1]
+				}
+			} else if part != "." && part != "" {
+				tmp = append(tmp, part)
+				tmp_path := dirPartsToPath(tmp)
+				fileInfo, err := os.Stat(tmp_path)
+				if err != nil {
+					fmt.Fprintf(stderr, "cd: %s: No such file or directory\n", tmp_path)
+					valid = false
+					break
+				} else if !fileInfo.IsDir() {
+					fmt.Fprintf(stderr, "cd: %s: Not a directory\n", tmp_path)
+					valid = false
+					break
+				}
+			}
+		}
+		if valid {
+			current_dir = tmp
+		}
+	}
+	return current_dir
+}
+
+func openRedirectFile(path string, append bool) *os.File {
+	if append {
+		f, _ := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		return f
+	}
+	f, _ := os.Create(path)
+	return f
+}
+
 func executePipeline(segments [][]string, current_dir []string) []string {
 	n := len(segments)
-	pipes := make([]*os.File, 0)
-	var cmds []*exec.Cmd
 	var pipeReaders []*os.File
 	var pipeWriters []*os.File
 
@@ -323,8 +392,9 @@ func executePipeline(segments [][]string, current_dir []string) []string {
 		}
 		pipeReaders = append(pipeReaders, r)
 		pipeWriters = append(pipeWriters, w)
-		pipes = append(pipes, r, w)
 	}
+
+	var wg sync.WaitGroup
 
 	for i, seg := range segments {
 		args := seg
@@ -332,60 +402,75 @@ func executePipeline(segments [][]string, current_dir []string) []string {
 		pos_redirect := min(stdout_redir, stderr_redir)
 		cmdArgs := args[:pos_redirect]
 
-		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-
+		var stdin *os.File
 		if i == 0 {
-			cmd.Stdin = os.Stdin
+			stdin = os.Stdin
 		} else {
-			cmd.Stdin = pipeReaders[i-1]
+			stdin = pipeReaders[i-1]
 		}
 
+		var stdout *os.File
+		var stdoutOpened bool
 		if i == n-1 {
 			if stdout_redir < len(args) {
-				filename := args[stdout_redir+1]
-				var file *os.File
-				if is_append {
-					file, _ = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-				} else {
-					file, _ = os.Create(filename)
-				}
-				cmd.Stdout = file
-				defer file.Close()
+				stdout = openRedirectFile(args[stdout_redir+1], is_append)
+				stdoutOpened = true
 			} else {
-				cmd.Stdout = os.Stdout
-			}
-			if stderr_redir < len(args) {
-				filename := args[stderr_redir+1]
-				var file *os.File
-				if is_append {
-					file, _ = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-				} else {
-					file, _ = os.Create(filename)
-				}
-				cmd.Stderr = file
-				defer file.Close()
-			} else {
-				cmd.Stderr = os.Stderr
+				stdout = os.Stdout
 			}
 		} else {
-			cmd.Stdout = pipeWriters[i]
-			cmd.Stderr = os.Stderr
+			stdout = pipeWriters[i]
 		}
 
-		cmds = append(cmds, cmd)
+		var stderr *os.File
+		var stderrOpened bool
+		if i == n-1 && stderr_redir < len(args) {
+			stderr = openRedirectFile(args[stderr_redir+1], is_append)
+			stderrOpened = true
+		} else {
+			stderr = os.Stderr
+		}
+
+		isBuiltin := slices.Contains(builtin_commands, cmdArgs[0])
+
+		if isBuiltin {
+			wg.Add(1)
+			go func(cArgs []string, in, out, errOut *os.File, outOpened, errOpened bool) {
+				defer wg.Done()
+				runBuiltin(cArgs, in, out, errOut, current_dir)
+				if outOpened {
+					out.Close()
+				}
+				if errOpened {
+					errOut.Close()
+				}
+			}(cmdArgs, stdin, stdout, stderr, stdoutOpened, stderrOpened)
+		} else {
+			cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+			cmd.Stdin = stdin
+			cmd.Stdout = stdout
+			cmd.Stderr = stderr
+			cmd.Start()
+			wg.Add(1)
+			go func(c *exec.Cmd, out *os.File, outOpened bool, errOut *os.File, errOpened bool) {
+				defer wg.Done()
+				c.Wait()
+				if outOpened {
+					out.Close()
+				}
+				if errOpened {
+					errOut.Close()
+				}
+			}(cmd, stdout, stdoutOpened, stderr, stderrOpened)
+		}
 	}
 
-	for _, cmd := range cmds {
-		cmd.Start()
-	}
-
+	// Close write ends so readers get EOF
 	for i := 0; i < len(pipeWriters); i++ {
 		pipeWriters[i].Close()
 	}
 
-	for _, cmd := range cmds {
-		cmd.Wait()
-	}
+	wg.Wait()
 
 	for i := 0; i < len(pipeReaders); i++ {
 		pipeReaders[i].Close()
@@ -427,13 +512,10 @@ func main() {
 		} else if args[0] == "type" {
 			command_string := args[1]
 			builtin_found := false
-			for _, cmd := range builtin_commands {
-				if cmd == command_string {
+			if slices.Contains(builtin_commands, command_string) {
 					stdout = fmt.Sprintf("%s is a shell builtin\n", command_string)
 					builtin_found = true
-					break
 				}
-			}
 			if !builtin_found {
 				if full_path, ok := searchCommandInPath(command_string); ok {
 					stdout = fmt.Sprintf("%s is %s\n", command_string, full_path)
