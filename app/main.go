@@ -15,7 +15,7 @@ import (
 )
 
 var _ = fmt.Fprint
-var builtin_commands = []string{"exit", "echo", "type", "pwd", "cd"}
+var builtin_commands = []string{"exit", "echo", "type", "pwd", "cd", "history"}
 
 func searchFileWithPerms(dir string, command string, perms os.FileMode) (bool) {
 	files, err := os.ReadDir(dir)
