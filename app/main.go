@@ -16,6 +16,7 @@ import (
 
 var _ = fmt.Fprint
 var builtin_commands = []string{"exit", "echo", "type", "pwd", "cd", "history"}
+var history_cmds []string
 
 func searchFileWithPerms(dir string, command string, perms os.FileMode) (bool) {
 	files, err := os.ReadDir(dir)
@@ -485,13 +486,13 @@ func main() {
 	for {
 		fmt.Fprint(os.Stdout, "$ ")
 		command, _ := readLineWithTabCompletion()
+		history_cmds = append(history_cmds, command)
 		command = strings.TrimSpace(command)
 		if command == "" {
 			continue
 		}
 		args := splitIntoArgs(command)
 
-		// Check for pipeline
 		hasPipe := slices.Contains(args, "|")
 
 		if hasPipe {
@@ -563,6 +564,10 @@ func main() {
 
 			if valid_path {
 				current_dir = tmp_current_dir
+			}
+		} else if args[0] == "history" {
+			for i, cmd := range history_cmds {
+				stdout += fmt.Sprintf("%d %s\n", i+1, cmd)
 			}
 		} else if _ , ok := searchCommandInPath(args[0]); ok{
 			cmd := exec.Command(args[0], args[1:pos_redirect]...)
