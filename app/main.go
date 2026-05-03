@@ -240,10 +240,14 @@ func tryTabCompletion(input string) (string, bool, int) {
 		if len(fileMatches) > 1 && lcp != "" && lcp != prefix {
 			return base + lcp, true, 1
 		}
-		if fileMatches[0][len(fileMatches[0])-1] == '/' {
-			return base + fileMatches[0], true, 1
-		} else {
-			return base + fileMatches[0] + " ", true, 1
+		if len(fileMatches) == 1 {
+			if fileMatches[0][len(fileMatches[0])-1] == '/' {
+				return base + fileMatches[0], true, 1
+			} else {
+				return base + fileMatches[0] + " ", true, 1
+			}
+		} else if len(fileMatches) > 1 {
+			return strings.Join(fileMatches, "  ") + " ", true, len(fileMatches)
 		}
 	}
 
