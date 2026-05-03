@@ -16,7 +16,7 @@ import (
 )
 
 var _ = fmt.Fprint
-var builtin_commands = []string{"exit", "echo", "type", "pwd", "cd", "history"}
+var builtin_commands = []string{"exit", "echo", "type", "pwd", "cd", "history", "jobs"}
 var history_cmds []string = readHistoryFromFile(os.Getenv("HISTFILE"))
 
 func searchFileWithPerms(dir string, command string, perms os.FileMode) (bool) {
@@ -703,6 +703,8 @@ func main() {
 			for i := len(history_cmds)-n; i < len(history_cmds); i++ {
 				stdout += fmt.Sprintf("%d %s\n", i+1, history_cmds[i])
 			}
+		} else if args[0] == "jobs" {
+			stdout += ""
 		} else if _ , ok := searchCommandInPath(args[0]); ok{
 			cmd := exec.Command(args[0], args[1:pos_redirect]...)
 			var stdoutBuf, stderrBuf bytes.Buffer
