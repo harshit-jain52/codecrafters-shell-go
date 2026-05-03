@@ -194,7 +194,58 @@ func longestCommonPrefix(strs []string) string {
 	return prefix
 }
 
+func fileCompletions(prefix string) []string {
+	dir := "."
+	filePrefix := prefix
+	if idx := strings.LastIndex(prefix, "/"); idx >= 0 {
+		dir = prefix[:idx]
+		if dir == "" {
+			dir = "/"
+		}
+		filePrefix = prefix[idx+1:]
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var matches []string
+	for _, entry := range entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, filePrefix) {
+			completed := name
+			if entry.IsDir() {
+				completed += "/"
+			}
+			if idx := strings.LastIndex(prefix, "/"); idx >= 0 {
+				completed = prefix[:idx+1] + completed
+			}
+			matches = append(matches, completed)
+		}
+	}
+	return matches
+}
+
 func tryTabCompletion(input string) (string, bool, int) {
+	// If input contains a space, complete the last argument as a filename
+	if strings.Contains(input, " ") {
+		lastSpace := strings.LastIndex(input, " ")
+		prefix := input[lastSpace+1:]
+		fileMatches := fileCompletions(prefix)
+		fileMatches = removeDuplicatesAndSort(fileMatches)
+		if len(fileMatches) == 0 {
+			return input, false, 0
+		}
+		lcp := longestCommonPrefix(fileMatches)
+		base := input[:lastSpace+1]
+		if len(fileMatches) > 1 && lcp != "" && lcp != prefix {
+			return base + lcp, true, 1
+		}
+		if len(fileMatches) == 1 {
+			return base + fileMatches[0] + " ", true, 1
+		}
+		return strings.Join(fileMatches, "  ") + " ", true, len(fileMatches)
+	}
+
 	trimmed := strings.TrimSpace(input)
 	matches := []string{}
 	for _, cmd := range builtin_commands {
