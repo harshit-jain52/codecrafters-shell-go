@@ -602,6 +602,8 @@ func runInBackground(cmdArgs []string, current_dir []string) int {
         return os.Getpid()
     }
     cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+    cmd.Stdout = os.Stdout
+    cmd.Stderr = os.Stderr
     cmd.Start()
     return cmd.Process.Pid
 }
