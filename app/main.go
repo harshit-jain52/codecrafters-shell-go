@@ -596,9 +596,21 @@ func executePipeline(segments [][]string, current_dir []string) []string {
 	return current_dir
 }
 
+func runInBackground(cmdArgs []string, current_dir []string) int {
+	if slices.Contains(builtin_commands, cmdArgs[0]) {
+        go runBuiltin(cmdArgs, os.Stdin, os.Stdout, os.Stderr, current_dir)
+        return os.Getpid()
+    }
+    cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+    cmd.Start()
+    return cmd.Process.Pid
+}
+
 func main() {
 	dir, _ := os.Getwd()
 	current_dir := strings.Split(dir, "/")[1:]
+	bg_job_num := 0
+
 	for {
 		fmt.Fprint(os.Stdout, "$ ")
 		command, _ := readLineWithTabCompletion()
@@ -609,7 +621,15 @@ func main() {
 		}
 		args := splitIntoArgs(command)
 
+		hasBackground := slices.Contains(args, "&")
 		hasPipe := slices.Contains(args, "|")
+
+		if hasBackground {
+			bg_job_num++
+			bg_pid := runInBackground(args[:len(args)-1], current_dir)
+			fmt.Printf("[%d] %d\n", bg_job_num, bg_pid)
+			continue
+		}
 
 		if hasPipe {
 			segments := splitByPipe(args)
