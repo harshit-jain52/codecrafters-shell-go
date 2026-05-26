@@ -332,7 +332,12 @@ func main() {
 				default:
 					if strings.Contains(args[1], "=") {
 						parts := strings.SplitN(args[1], "=", 2)
-						declareVariable(parts[0], parts[1])
+						ok := validateVariableName(parts[0])
+						if !ok {
+							stderr += fmt.Sprintf("declare: `%s=%s': not a valid identifier\n", parts[0], parts[1])
+						} else {
+							declareVariable(parts[0], parts[1])
+						}
 					}
 				}
 			}
