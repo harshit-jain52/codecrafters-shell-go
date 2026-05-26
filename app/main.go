@@ -719,7 +719,9 @@ func main() {
 			if len(jobs) == 0 {
 				stdout += ""
 			} else {
-				stdout += formatJobOutput(bg_job_num)
+				for i := 1; i <= len(jobs); i++ {
+					stdout += formatJobOutput(i)
+				}
 			}
 		} else if _ , ok := searchCommandInPath(args[0]); ok{
 			cmd := exec.Command(args[0], args[1:pos_redirect]...)

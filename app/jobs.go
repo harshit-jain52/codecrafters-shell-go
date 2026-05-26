@@ -61,5 +61,11 @@ func formatJobOutput(job_num int) string {
 		status = "Done"
 	}
 
-	return fmt.Sprintf("[%d]+  %s                 %s\n", job_num, status, job.Command)
+	marker := " "
+	if job_num == len(jobs) {
+		marker = "+"
+	} else if job_num == len(jobs)-1 {
+		marker = "-"
+	}
+	return fmt.Sprintf("[%d]%s  %s                 %s\n", job_num, marker, status, job.Command)
 }
