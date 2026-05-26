@@ -13,7 +13,7 @@ import (
 )
 
 var _ = fmt.Fprint
-var builtin_commands = []string{"exit", "echo", "type", "pwd", "cd", "history", "jobs", "complete"}
+var builtin_commands = []string{"exit", "echo", "type", "pwd", "cd", "history", "jobs", "complete", "declare"}
 var history_cmds []string = readHistoryFromFile(os.Getenv("HISTFILE"))
 
 
