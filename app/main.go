@@ -324,7 +324,16 @@ func main() {
 			if len(args) >= 2 {
 				switch args[1] {
 				case "-p":
-					stderr += fmt.Sprintf("declare: %s: not found\n", args[2])
+					if value, ok := getVariable(args[2]); ok {
+						stdout += fmt.Sprintf("declare -- %s=\"%s\"\n", args[2], value)
+					} else {
+						stderr += fmt.Sprintf("declare: %s: not found\n", args[2])
+					}
+				default:
+					if strings.Contains(args[1], "=") {
+						parts := strings.SplitN(args[1], "=", 2)
+						declareVariable(parts[0], parts[1])
+					}
 				}
 			}
 		} else if _ , ok := searchCommandInPath(args[0]); ok{
