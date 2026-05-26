@@ -303,7 +303,7 @@ func main() {
 			}
 			removeCompletedJobs()
 		} else if args[0] == "complete" {
-			if len(args) >= 2{
+			if len(args) >= 2 {
 				switch args[1] {
 				case "-p":
 					path, ok := getCompletionSpec(args[2])
@@ -318,6 +318,13 @@ func main() {
 					}
 				case "-r":
 					unregisterCompletion(args[2])
+				}
+			}
+		} else if args[0] == "declare" {
+			if len(args) >= 2 {
+				switch args[1] {
+				case "-p":
+					stderr += fmt.Sprintf("declare: %s: not found\n", args[2])
 				}
 			}
 		} else if _ , ok := searchCommandInPath(args[0]); ok{
