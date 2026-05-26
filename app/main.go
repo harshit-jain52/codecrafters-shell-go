@@ -722,6 +722,7 @@ func main() {
 					stdout += formatJobOutput(i)
 				}
 			}
+			removeCompletedJobs()
 		} else if _ , ok := searchCommandInPath(args[0]); ok{
 			cmd := exec.Command(args[0], args[1:pos_redirect]...)
 			var stdoutBuf, stderrBuf bytes.Buffer

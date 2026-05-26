@@ -78,14 +78,13 @@ func formatJobOutput(job_idx int) string {
 	status := "Running"
 	if !job.IsRunning {
 		status = "Done"
-		removeJob(num)
 	}
 
 	marker := " "
-	switch num {
-		case bg_job_num:
+	switch job_idx {
+		case len(jobs) - 1:
 			marker = "+"
-		case bg_job_num - 1:
+		case len(jobs) - 2:
 			marker = "-"
 	}
 	return fmt.Sprintf("[%d]%s  %s                 %s\n", num, marker, status, cmd)
@@ -103,14 +102,13 @@ func setStatusDone(job_num int) {
 	}
 }
 
-func removeJob(job_num int) {
+func removeCompletedJobs() {
 	jobsMux.Lock()
 	defer jobsMux.Unlock()
 
 	for job_idx, job := range jobs {
-		if job.Number == job_num {
+		if !job.IsRunning {
 			jobs = append(jobs[:job_idx], jobs[job_idx+1:]...)
-			return
 		}
 	}
 }
