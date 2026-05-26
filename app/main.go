@@ -303,8 +303,20 @@ func main() {
 			}
 			removeCompletedJobs()
 		} else if args[0] == "complete" {
-			if len(args) >= 2 && args[1] == "-p" {
-				stderr += fmt.Sprintf("complete: %s: no completion specification\n", args[2])
+			if len(args) >= 2{
+				switch args[1] {
+				case "-p":
+					path, ok := getCompletionSpec(args[2])
+					if ok {
+						stdout += fmt.Sprintf("complete -C '%s' %s\n", path, args[2])
+					} else {
+						stderr += fmt.Sprintf("complete: %s: no completion specification\n", args[2])
+					}
+				case "-C":
+					if len(args) >= 4 {
+						registerCompletion(args[3], args[2])
+					}
+				}
 			}
 		} else if _ , ok := searchCommandInPath(args[0]); ok{
 			cmd := exec.Command(args[0], args[1:pos_redirect]...)
