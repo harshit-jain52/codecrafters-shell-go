@@ -199,6 +199,10 @@ func tryTabCompletion(input string) (string, bool, int) {
 		output, _ := cmd.Output()
 		result := strings.TrimSpace(string(output))
 		matches := strings.Split(result, "\n")
+		lcp := longestCommonPrefix(matches)
+		if len(matches) > 1 && lcp != "" && lcp != argv2 {
+			return input[:len(input)-len(argv2)] + lcp, true, 1
+		}
 		if len(matches) > 1 {
 			sort.Strings(matches)
 			return strings.Join(matches, "  ") + " ", true, len(matches)
