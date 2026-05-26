@@ -39,9 +39,15 @@ func replaceVariables(args []string) {
 	for i, arg := range args {
 		if len(arg) > 1 && strings.Contains(arg, "$") {
 			dollarIdx := strings.Index(arg, "$")
+			endIdx := len(arg)
 			varName := arg[dollarIdx+1:]
+			if arg[dollarIdx+1] == '{' {
+				closingIdx := strings.Index(arg[dollarIdx:], "}")
+				endIdx = dollarIdx + closingIdx + 1
+				varName = arg[dollarIdx+2 : dollarIdx+closingIdx]
+			}
 			if value, ok := getVariable(varName); ok {
-				args[i] = arg[:dollarIdx] + value
+				args[i] = arg[:dollarIdx] + value + arg[endIdx:]
 			} else {
 				args[i] = "" // Undefined variables are replaced with empty string
 			}
