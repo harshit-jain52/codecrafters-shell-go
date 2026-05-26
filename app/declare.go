@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"unicode"
 )
 
@@ -32,4 +33,18 @@ func validateVariableName(name string) bool {
 	}
 
 	return true
+}
+
+func replaceVariables(args []string) {
+	for i, arg := range args {
+		if len(arg) > 1 && strings.Contains(arg, "$") {
+			dollarIdx := strings.Index(arg, "$")
+			varName := arg[dollarIdx+1:]
+			if value, ok := getVariable(varName); ok {
+				args[i] = arg[:dollarIdx] + value
+			} else {
+				args[i] = "" // Undefined variables are replaced with empty string
+			}
+		}
+	}
 }

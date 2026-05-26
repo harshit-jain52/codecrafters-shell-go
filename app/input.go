@@ -71,6 +71,7 @@ func splitIntoArgs(arg_str string) []string {
 	if current_arg.Len() > 0 {
 		args = append(args, current_arg.String())
 	}
+	replaceVariables(args)
 	return args
 }
 
