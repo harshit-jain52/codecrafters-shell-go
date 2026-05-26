@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -179,6 +180,14 @@ func fileCompletions(prefix string) []string {
 }
 
 func tryTabCompletion(input string) (string, bool, int) {
+	path, found := getCompletionSpec(strings.TrimSpace(input))
+	if found {
+		cmd := exec.Command(path)
+		output, _ := cmd.Output()
+		result := strings.TrimSpace(string(output))
+		return input+result+" ", true, 1
+	}
+
 	// If input contains a space, complete the last argument as a filename
 	if strings.Contains(input, " ") {
 		lastSpace := strings.LastIndex(input, " ")
