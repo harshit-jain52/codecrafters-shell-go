@@ -22,6 +22,25 @@ var (
 	jobsMux sync.Mutex
 )
 
+func getNextJobNum() int {
+	jobsMux.Lock()
+	defer jobsMux.Unlock()
+
+	for i := 1; i <= len(jobs); i++ {
+		found := false
+		for _, job := range jobs {
+			if job.Number == i {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return i
+		}
+	}
+	return len(jobs) + 1
+}
+
 func runInBackground(cmdArgs []string, current_dir []string, job_num int) int {
 
 	// Builtin commands

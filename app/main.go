@@ -18,7 +18,6 @@ import (
 var _ = fmt.Fprint
 var builtin_commands = []string{"exit", "echo", "type", "pwd", "cd", "history", "jobs"}
 var history_cmds []string = readHistoryFromFile(os.Getenv("HISTFILE"))
-var bg_job_num int = 0
 
 func searchFileWithPerms(dir string, command string, perms os.FileMode) (bool) {
 	files, err := os.ReadDir(dir)
@@ -616,7 +615,7 @@ func main() {
 		hasPipe := slices.Contains(args, "|")
 
 		if hasBackground {
-			bg_job_num++
+			bg_job_num := getNextJobNum()
 			bg_pid := runInBackground(args[:len(args)-1], current_dir, bg_job_num)
 			fmt.Printf("[%d] %d\n", bg_job_num, bg_pid)
 			continue
@@ -737,7 +736,7 @@ func main() {
 
 		stdout += reapOutput()
 		removeCompletedJobs()
-		
+
 		if stdout_redir < len(args) {
 			filename := args[stdout_redir+1]
 			if is_append {
