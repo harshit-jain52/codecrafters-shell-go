@@ -180,12 +180,28 @@ func fileCompletions(prefix string) []string {
 }
 
 func tryTabCompletion(input string) (string, bool, int) {
-	path, found := getCompletionSpec(strings.TrimSpace(input))
+	args := splitIntoArgs(input)
+	path, found := getCompletionSpec(args[0])
 	if found {
-		cmd := exec.Command(path)
+		argv1 := args[0]
+		argv2 := ""
+		if !strings.HasSuffix(input, " ") {
+			argv2 = args[len(args)-1]
+		}
+		argv3 := ""
+		if len(args) > 2 {
+			argv3 = args[len(args)-2]
+		}
+		cmd := exec.Command(path, argv1, argv2, argv3)
 		output, _ := cmd.Output()
-		result := strings.TrimSpace(string(output))
-		return input+result+" ", true, 1
+		result := strings.TrimSpace(string(output)) + " "
+		if result == " " {
+			return input, false, 0
+		}
+		if argv2 != "" && strings.HasPrefix(result, argv2) {
+			result = result[len(argv2):]
+		}
+		return input + result, true, 1
 	}
 
 	// If input contains a space, complete the last argument as a filename
