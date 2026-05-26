@@ -16,7 +16,7 @@ import (
 )
 
 var _ = fmt.Fprint
-var builtin_commands = []string{"exit", "echo", "type", "pwd", "cd", "history", "jobs"}
+var builtin_commands = []string{"exit", "echo", "type", "pwd", "cd", "history", "jobs", "complete"}
 var history_cmds []string = readHistoryFromFile(os.Getenv("HISTFILE"))
 
 func searchFileWithPerms(dir string, command string, perms os.FileMode) (bool) {
@@ -64,7 +64,8 @@ func splitIntoArgs(arg_str string) []string {
 	in_single_quotes := false
 	in_double_quotes := false
 	for i := 0; i < len(arg_str); i++ {
-		if arg_str[i] == ' '{
+		switch arg_str[i] {
+		case ' ':
 			if in_single_quotes || in_double_quotes {
 				current_arg.WriteByte(arg_str[i])
 			} else {
@@ -73,7 +74,7 @@ func splitIntoArgs(arg_str string) []string {
 					current_arg.Reset()
 				}
 			}
-		} else if arg_str[i] == '"' {
+		case '"':
 			if in_single_quotes {
 				current_arg.WriteByte(arg_str[i])
 			} else {
@@ -83,7 +84,7 @@ func splitIntoArgs(arg_str string) []string {
 					in_double_quotes = !in_double_quotes
 				}
 			}
-		} else if arg_str[i] == '\'' {
+		case '\'':
 			if in_double_quotes {
 				current_arg.WriteByte(arg_str[i])
 			} else {
@@ -93,7 +94,7 @@ func splitIntoArgs(arg_str string) []string {
 					in_single_quotes = !in_single_quotes
 				}
 			}
-		} else if arg_str[i] == '\\' {
+		case '\\':
 			if !in_single_quotes && !in_double_quotes {
 				if i+1 < len(arg_str) {
 					current_arg.WriteByte(arg_str[i+1])
@@ -109,7 +110,7 @@ func splitIntoArgs(arg_str string) []string {
 			} else if in_single_quotes {
 				current_arg.WriteByte(arg_str[i]) // No escaping
 			}
-		} else {
+		default:
 			current_arg.WriteByte(arg_str[i])
 		}
 	}
@@ -695,14 +696,15 @@ func main() {
 		} else if args[0] == "history" {
 			n := len(history_cmds)
 			if len(args) > 2 {
-				if args[1] == "-r" {
+				switch args[1] {
+				case "-r":
 					history_file_cmds := readHistoryFromFile(args[2])
 					for _, cmd := range history_file_cmds {
 						history_cmds = append(history_cmds, cmd)
 					}
-				} else if args[1] == "-w" {
+				case "-w":
 					writeHistoryToFile(args[2], history_cmds)
-				} else if args[1] == "-a" {
+				case "-a":
 					appendHistoryToFile(args[2], history_cmds)
 				}
 			}
