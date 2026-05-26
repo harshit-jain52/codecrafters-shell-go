@@ -192,19 +192,24 @@ func tryTabCompletion(input string) (string, bool, int) {
 			argv2 = args[len(args)-1]
 		}
 		argv3 := ""
-		if len(args) > 2 {
+		if len(args) >= 2 {
 			argv3 = args[len(args)-2]
 		}
 		cmd := exec.Command(path, argv1, argv2, argv3)
 		output, _ := cmd.Output()
-		result := strings.TrimSpace(string(output)) + " "
-		if result == " " {
+		result := strings.TrimSpace(string(output))
+		matches := strings.Split(result, "\n")
+		if len(matches) > 1 {
+			sort.Strings(matches)
+			return strings.Join(matches, "  ") + " ", true, len(matches)
+		} 
+		if result == "" {
 			return input, false, 0
 		}
 		if argv2 != "" && strings.HasPrefix(result, argv2) {
 			result = result[len(argv2):]
 		}
-		return input + result, true, 1
+		return input + result + " ", true, 1
 	}
 
 	// If input contains a space, complete the last argument as a filename
