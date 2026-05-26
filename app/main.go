@@ -18,7 +18,7 @@ import (
 var _ = fmt.Fprint
 var builtin_commands = []string{"exit", "echo", "type", "pwd", "cd", "history", "jobs"}
 var history_cmds []string = readHistoryFromFile(os.Getenv("HISTFILE"))
-var jobs []Job
+var bg_job_num int = 0
 
 func searchFileWithPerms(dir string, command string, perms os.FileMode) (bool) {
 	files, err := os.ReadDir(dir)
@@ -601,7 +601,6 @@ func executePipeline(segments [][]string, current_dir []string) []string {
 func main() {
 	dir, _ := os.Getwd()
 	current_dir := strings.Split(dir, "/")[1:]
-	bg_job_num := 0
 
 	for {
 		fmt.Fprint(os.Stdout, "$ ")
@@ -719,7 +718,7 @@ func main() {
 			if len(jobs) == 0 {
 				stdout += ""
 			} else {
-				for i := 1; i <= len(jobs); i++ {
+				for i := range jobs {
 					stdout += formatJobOutput(i)
 				}
 			}

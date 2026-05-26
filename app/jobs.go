@@ -6,13 +6,20 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+	"sync"
 )
 
 type Job struct {
+	Number int
 	Pid     int
 	Command string
 	IsRunning bool
 }
+
+var (
+	jobs    []Job
+	jobsMux sync.Mutex
+)
 
 func runInBackground(cmdArgs []string, current_dir []string, job_num int) int {
 
@@ -20,15 +27,18 @@ func runInBackground(cmdArgs []string, current_dir []string, job_num int) int {
 	if slices.Contains(builtin_commands, cmdArgs[0]) {
 		pid := os.Getpid()
 
+		jobsMux.Lock()
 		jobs = append(jobs, Job{
+			Number: job_num,
 			Pid:       pid,
 			Command:   strings.Join(cmdArgs, " "),
 			IsRunning: true,
 		})
+		jobsMux.Unlock()
 
 		go func() {
 			runBuiltin(cmdArgs, os.Stdin, os.Stdout, os.Stderr, current_dir)
-			jobs[job_num-1].IsRunning = false
+			setStatusDone(job_num)
 		}()
 
 		return pid
@@ -40,32 +50,67 @@ func runInBackground(cmdArgs []string, current_dir []string, job_num int) int {
 	cmd.Stderr = os.Stderr
 	cmd.Start()
 
+	jobsMux.Lock()
 	jobs = append(jobs, Job{
+		Number: job_num,
 		Pid:       cmd.Process.Pid,
 		Command:   strings.Join(cmdArgs, " "),
 		IsRunning: true,
 	})
+	jobsMux.Unlock()
 
 	go func() {
 		cmd.Wait()
-		jobs[job_num - 1].IsRunning = false
+		setStatusDone(job_num)
 	}()
 
 	return cmd.Process.Pid
 }
 
-func formatJobOutput(job_num int) string {
-	job := jobs[job_num-1]
+func formatJobOutput(job_idx int) string {
+	jobsMux.Lock()
+	job := jobs[job_idx]
+	jobsMux.Unlock()
+	
+	num := job.Number
+	cmd := job.Command
+	
 	status := "Running"
 	if !job.IsRunning {
 		status = "Done"
+		removeJob(num)
 	}
 
 	marker := " "
-	if job_num == len(jobs) {
-		marker = "+"
-	} else if job_num == len(jobs)-1 {
-		marker = "-"
+	switch num {
+		case bg_job_num:
+			marker = "+"
+		case bg_job_num - 1:
+			marker = "-"
 	}
-	return fmt.Sprintf("[%d]%s  %s                 %s\n", job_num, marker, status, job.Command)
+	return fmt.Sprintf("[%d]%s  %s                 %s\n", num, marker, status, cmd)
+}
+
+func setStatusDone(job_num int) {
+	jobsMux.Lock()
+	defer jobsMux.Unlock()
+
+	for job_idx, job := range jobs {
+		if job.Number == job_num {
+			jobs[job_idx].IsRunning = false
+			return
+		}
+	}
+}
+
+func removeJob(job_num int) {
+	jobsMux.Lock()
+	defer jobsMux.Unlock()
+
+	for job_idx, job := range jobs {
+		if job.Number == job_num {
+			jobs = append(jobs[:job_idx], jobs[job_idx+1:]...)
+			return
+		}
+	}
 }
