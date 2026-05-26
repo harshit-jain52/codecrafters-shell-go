@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -183,6 +184,8 @@ func tryTabCompletion(input string) (string, bool, int) {
 	args := splitIntoArgs(input)
 	path, found := getCompletionSpec(args[0])
 	if found {
+		os.Setenv("COMP_LINE", input)
+		os.Setenv("COMP_POINT", strconv.Itoa(len(input)))
 		argv1 := args[0]
 		argv2 := ""
 		if !strings.HasSuffix(input, " ") {
