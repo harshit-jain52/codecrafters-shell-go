@@ -14,6 +14,7 @@ type Job struct {
 	Pid     int
 	Command string
 	IsRunning bool
+	ToReap bool
 }
 
 var (
@@ -33,6 +34,7 @@ func runInBackground(cmdArgs []string, current_dir []string, job_num int) int {
 			Pid:       pid,
 			Command:   strings.Join(cmdArgs, " "),
 			IsRunning: true,
+			ToReap: false,
 		})
 		jobsMux.Unlock()
 
@@ -56,6 +58,7 @@ func runInBackground(cmdArgs []string, current_dir []string, job_num int) int {
 		Pid:       cmd.Process.Pid,
 		Command:   strings.Join(cmdArgs, " "),
 		IsRunning: true,
+		ToReap: false,
 	})
 	jobsMux.Unlock()
 
@@ -68,16 +71,14 @@ func runInBackground(cmdArgs []string, current_dir []string, job_num int) int {
 }
 
 func formatJobOutput(job_idx int) string {
-	jobsMux.Lock()
 	job := jobs[job_idx]
-	jobsMux.Unlock()
-	
 	num := job.Number
 	cmd := job.Command
 	
 	status := "Running"
 	if !job.IsRunning {
 		status = "Done"
+		jobs[job_idx].ToReap = true	
 	}
 
 	marker := " "
@@ -88,6 +89,30 @@ func formatJobOutput(job_idx int) string {
 			marker = "-"
 	}
 	return fmt.Sprintf("[%d]%s  %s                 %s\n", num, marker, status, cmd)
+}
+
+func jobsOutput() string {
+	jobsMux.Lock()
+	defer jobsMux.Unlock()
+	
+	var output string
+	for job_idx := range jobs {
+		output += formatJobOutput(job_idx)
+	}
+	return output
+}
+
+func reapOutput() string {
+	jobsMux.Lock()
+	defer jobsMux.Unlock()
+
+	var output string
+	for job_idx, job := range jobs {
+		if !job.IsRunning {
+			output += formatJobOutput(job_idx)
+		}
+	}
+	return output
 }
 
 func setStatusDone(job_num int) {
@@ -107,7 +132,7 @@ func removeCompletedJobs() {
 	defer jobsMux.Unlock()
 
 	for job_idx, job := range jobs {
-		if !job.IsRunning {
+		if job.ToReap {
 			jobs = append(jobs[:job_idx], jobs[job_idx+1:]...)
 		}
 	}

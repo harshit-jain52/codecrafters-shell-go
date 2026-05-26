@@ -718,9 +718,7 @@ func main() {
 			if len(jobs) == 0 {
 				stdout += ""
 			} else {
-				for i := range jobs {
-					stdout += formatJobOutput(i)
-				}
+				stdout += jobsOutput()
 			}
 			removeCompletedJobs()
 		} else if _ , ok := searchCommandInPath(args[0]); ok{
@@ -737,6 +735,9 @@ func main() {
 			stderr = fmt.Sprintf("%s: command not found\n", args[0])
 		}
 
+		stdout += reapOutput()
+		removeCompletedJobs()
+		
 		if stdout_redir < len(args) {
 			filename := args[stdout_redir+1]
 			if is_append {
