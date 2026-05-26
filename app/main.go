@@ -316,6 +316,8 @@ func main() {
 					if len(args) >= 4 {
 						registerCompletion(args[3], args[2])
 					}
+				case "-r":
+					unregisterCompletion(args[2])
 				}
 			}
 		} else if _ , ok := searchCommandInPath(args[0]); ok{

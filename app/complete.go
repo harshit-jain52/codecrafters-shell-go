@@ -10,3 +10,7 @@ func getCompletionSpec(name string) (string, bool) {
 	spec, ok := completions[name]
 	return spec, ok
 }
+
+func unregisterCompletion(name string) {
+	delete(completions, name)
+}
