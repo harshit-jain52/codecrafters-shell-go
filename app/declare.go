@@ -49,8 +49,18 @@ func replaceVariables(args []string) {
 			if value, ok := getVariable(varName); ok {
 				args[i] = arg[:dollarIdx] + value + arg[endIdx:]
 			} else {
-				args[i] = "" // Undefined variables are replaced with empty string
+				args[i] = arg[:dollarIdx] + arg[endIdx:]
 			}
 		}
 	}
+}
+
+func cleanUpEmptyArgs(args []string) []string {
+	cleaned := make([]string, 0, len(args))
+	for _, arg := range args {
+		if arg != "" {
+			cleaned = append(cleaned, arg)
+		}
+	}
+	return cleaned
 }

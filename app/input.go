@@ -72,7 +72,7 @@ func splitIntoArgs(arg_str string) []string {
 		args = append(args, current_arg.String())
 	}
 	replaceVariables(args)
-	return args
+	return cleanUpEmptyArgs(args)
 }
 
 func posRedirect(args []string) (int, int, bool) {
