@@ -18,6 +18,7 @@ import (
 var _ = fmt.Fprint
 var builtin_commands = []string{"exit", "echo", "type", "pwd", "cd", "history", "jobs"}
 var history_cmds []string = readHistoryFromFile(os.Getenv("HISTFILE"))
+var jobs []Job
 
 func searchFileWithPerms(dir string, command string, perms os.FileMode) (bool) {
 	files, err := os.ReadDir(dir)
@@ -596,17 +597,6 @@ func executePipeline(segments [][]string, current_dir []string) []string {
 	return current_dir
 }
 
-func runInBackground(cmdArgs []string, current_dir []string) int {
-	if slices.Contains(builtin_commands, cmdArgs[0]) {
-        go runBuiltin(cmdArgs, os.Stdin, os.Stdout, os.Stderr, current_dir)
-        return os.Getpid()
-    }
-    cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-    cmd.Stdout = os.Stdout
-    cmd.Stderr = os.Stderr
-    cmd.Start()
-    return cmd.Process.Pid
-}
 
 func main() {
 	dir, _ := os.Getwd()
@@ -628,7 +618,7 @@ func main() {
 
 		if hasBackground {
 			bg_job_num++
-			bg_pid := runInBackground(args[:len(args)-1], current_dir)
+			bg_pid := runInBackground(args[:len(args)-1], current_dir, bg_job_num)
 			fmt.Printf("[%d] %d\n", bg_job_num, bg_pid)
 			continue
 		}
@@ -726,7 +716,11 @@ func main() {
 				stdout += fmt.Sprintf("%d %s\n", i+1, history_cmds[i])
 			}
 		} else if args[0] == "jobs" {
-			stdout += ""
+			if len(jobs) == 0 {
+				stdout += ""
+			} else {
+				stdout += formatJobOutput(bg_job_num)
+			}
 		} else if _ , ok := searchCommandInPath(args[0]); ok{
 			cmd := exec.Command(args[0], args[1:pos_redirect]...)
 			var stdoutBuf, stderrBuf bytes.Buffer
